@@ -19,7 +19,7 @@ from google.protobuf import descriptor_pool
 from google.protobuf import reflection
 from google.protobuf.internal.decoder import _DecodeVarint32
 from google.protobuf.internal.encoder import _VarintEncoder
-from google.protobuf.descriptor_pb2 import FileDescriptorSet
+from google.protobuf.descriptor_pb2 import FileDescriptorSet, FileDescriptorProto
 
 
 MAGIC = b'\x41\x42'
@@ -30,23 +30,35 @@ T_MESSAGE = 3
 
 def write_pbz(fname, fdescr, *msgs):
     ve = _VarintEncoder()
+    dpool = descriptor_pool.DescriptorPool()
+
+    # Read FileDescriptorSet
+    with open(fdescr, "rb") as fi:
+        fdset = fi.read()
+        sz = fi.tell()
+
+    # Parse descriptor for checking that the messages will be defined in
+    # the serialized file
+    ds = FileDescriptorSet()
+    ds.ParseFromString(fdset)
+    for df in ds.file:
+        dpool.Add(df)
 
     with gzip.open(fname, "wb") as fo:
         fo.write(MAGIC)
 
-        # Read FileDescriptorSet
-        with open(fdescr, "rb") as fi:
-            fdset = fi.read()
-            sz = fi.tell()
-
-        # Write it as header
+        # Write FileDescriptorSet
         fo.write(bytes([T_FILE_DESCRIPTOR]))
         ve(fo.write, sz)
         fo.write(fdset)
 
+        # Write messages
         last_descriptor = None
         for msg in msgs:
             if msg.DESCRIPTOR.full_name != last_descriptor:
+                # Check that the message type has been defined
+                dpool.FindMessageTypeByName(msg.DESCRIPTOR.full_name)
+
                 fo.write(bytes([T_DESCRIPTOR_NAME]))
                 ve(fo.write, len(msg.DESCRIPTOR.full_name))
                 fo.write(msg.DESCRIPTOR.full_name.encode("utf8"))
@@ -58,8 +70,8 @@ def write_pbz(fname, fdescr, *msgs):
 
 
 def open_pbz(fname):
-    dpool = None
-    descriptor = None
+    dpool = descriptor_pool.DescriptorPool()
+    descr = None
 
     with gzip.open(fname, "rb") as f:
         assert f.read(len(MAGIC)) == MAGIC
@@ -89,15 +101,14 @@ def open_pbz(fname):
             if vtype == T_FILE_DESCRIPTOR:
                 ds = FileDescriptorSet()
                 ds.ParseFromString(data)
-                dpool = descriptor_pool.DescriptorPool()
                 for df in ds.file:
                     dpool.Add(df)
 
             elif vtype == T_DESCRIPTOR_NAME:
-                descriptor = dpool.FindMessageTypeByName(data.decode("utf8"))
+                descr = dpool.FindMessageTypeByName(data.decode("utf8"))
 
             elif vtype == T_MESSAGE:
-                msg = reflection.ParseMessage(descriptor, data)
+                msg = reflection.ParseMessage(descr, data)
                 yield msg
 
             else:
