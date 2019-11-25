@@ -3,5 +3,5 @@
 ## Installation
 
 ```
-$ pip install --upgrade https://github.com/fabgeyer/pbzlib/archive/master.tar.gz
+$ pip install --upgrade https://github.com/fabgeyer/pbzlib-py/archive/master.tar.gz
 ```
