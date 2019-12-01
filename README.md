@@ -15,7 +15,7 @@ $ pip install --upgrade https://github.com/fabgeyer/pbzlib-py/archive/master.tar
 
 Reading a `pbz` file:
 
-```
+```python
 from pbzlib import open_pbz
 
 for msg in open_pbz("/path/to/file.pbz"):
