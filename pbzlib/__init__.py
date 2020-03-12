@@ -21,52 +21,83 @@ from google.protobuf.internal.decoder import _DecodeVarint32
 from google.protobuf.internal.encoder import _VarintEncoder
 from google.protobuf.descriptor_pb2 import FileDescriptorSet, FileDescriptorProto
 
-
 MAGIC = b'\x41\x42'
 T_FILE_DESCRIPTOR = 1
 T_DESCRIPTOR_NAME = 2
 T_MESSAGE = 3
 
 
-def write_pbz(fname, fdescr, *msgs):
-    ve = _VarintEncoder()
-    dpool = descriptor_pool.DescriptorPool()
+class PBZWriter:
+    def __init__(self, fname, fdescr, autoflush=False):
+        self._ve = _VarintEncoder()
+        self._dpool = descriptor_pool.DescriptorPool()
+        self._last_descriptor = None
+        self.autoflush = autoflush
 
-    # Read FileDescriptorSet
-    with open(fdescr, "rb") as fi:
-        fdset = fi.read()
-        sz = fi.tell()
+        self._fobj = gzip.open(fname, "wb")
+        self._write_header(fdescr)
 
-    # Parse descriptor for checking that the messages will be defined in
-    # the serialized file
-    ds = FileDescriptorSet()
-    ds.ParseFromString(fdset)
-    for df in ds.file:
-        dpool.Add(df)
+    def __enter__(self):
+        return self
 
-    with gzip.open(fname, "wb") as fo:
-        fo.write(MAGIC)
+    def __exit__(self, type, value, tb):
+        self.close()
+
+    def _write_header(self, fdescr):
+        # Read FileDescriptorSet
+        with open(fdescr, "rb") as fi:
+            fdset = fi.read()
+            sz = fi.tell()
+
+        # Parse descriptor for checking that the messages will be defined in
+        # the serialized file
+        ds = FileDescriptorSet()
+        ds.ParseFromString(fdset)
+        for df in ds.file:
+            self._dpool.Add(df)
+
+        self._fobj.write(MAGIC)
 
         # Write FileDescriptorSet
-        fo.write(bytes([T_FILE_DESCRIPTOR]))
-        ve(fo.write, sz)
-        fo.write(fdset)
+        self._write_blob(T_FILE_DESCRIPTOR, sz, fdset)
 
-        # Write messages
-        last_descriptor = None
+    def _write_blob(self, mtype, size, value):
+        self._fobj.write(bytes([mtype]))
+        self._ve(self._fobj.write, size)
+        self._fobj.write(value)
+        if self.autoflush:
+            self._fobj.flush()
+
+    def close(self):
+        """
+        Close PBZ file
+        """
+        self._fobj.close()
+
+    def write(self, msg):
+        """
+        Writes a protobuf message to the file
+        """
+        if msg.DESCRIPTOR.full_name != self._last_descriptor:
+            # Check that the message type has been defined
+            self._dpool.FindMessageTypeByName(msg.DESCRIPTOR.full_name)
+
+            self._write_blob(T_DESCRIPTOR_NAME, len(msg.DESCRIPTOR.full_name), msg.DESCRIPTOR.full_name.encode("utf8"))
+            self._last_descriptor = msg.DESCRIPTOR.full_name
+
+        self._write_blob(T_MESSAGE, msg.ByteSize(), msg.SerializeToString())
+
+
+def write_pbz(fname, fdescr, *msgs):
+    w = PBZWriter(fname, fdescr)
+    if len(msgs) == 0:
+        # Returns writer to caller
+        return w
+    else:
+        # Directly write the messages to file and close
         for msg in msgs:
-            if msg.DESCRIPTOR.full_name != last_descriptor:
-                # Check that the message type has been defined
-                dpool.FindMessageTypeByName(msg.DESCRIPTOR.full_name)
-
-                fo.write(bytes([T_DESCRIPTOR_NAME]))
-                ve(fo.write, len(msg.DESCRIPTOR.full_name))
-                fo.write(msg.DESCRIPTOR.full_name.encode("utf8"))
-                last_descriptor = msg.DESCRIPTOR.full_name
-
-            fo.write(bytes([T_MESSAGE]))
-            ve(fo.write, msg.ByteSize())
-            fo.write(msg.SerializeToString())
+            w.write(msg)
+        w.close()
 
 
 def open_pbz(fname):
@@ -113,4 +144,3 @@ def open_pbz(fname):
 
             else:
                 raise Exception(f"Unknown message type {vtype}")
-
