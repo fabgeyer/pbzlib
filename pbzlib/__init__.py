@@ -14,17 +14,19 @@ their descriptor full name and then their value.
 """
 
 import gzip
-from google.protobuf import descriptor
+import warnings
+import google.protobuf
 from google.protobuf import descriptor_pool
 from google.protobuf import reflection
 from google.protobuf.internal.decoder import _DecodeVarint32
 from google.protobuf.internal.encoder import _VarintEncoder
-from google.protobuf.descriptor_pb2 import FileDescriptorSet, FileDescriptorProto
+from google.protobuf.descriptor_pb2 import FileDescriptorSet
 
 MAGIC = b'\x41\x42'
 T_FILE_DESCRIPTOR = 1
 T_DESCRIPTOR_NAME = 2
 T_MESSAGE = 3
+T_PROTOBUF_VERSION = 4
 
 
 class PBZWriter:
@@ -57,6 +59,9 @@ class PBZWriter:
             self._dpool.Add(df)
 
         self._fobj.write(MAGIC)
+
+        # Write protocol buffer version in header
+        self._write_blob(T_PROTOBUF_VERSION, len(google.protobuf.__version__), google.protobuf.__version__.encode("utf8"))
 
         # Write FileDescriptorSet
         self._write_blob(T_FILE_DESCRIPTOR, sz, fdset)
@@ -141,6 +146,11 @@ def open_pbz(fname):
             elif vtype == T_MESSAGE:
                 msg = reflection.ParseMessage(descr, data)
                 yield msg
+
+            elif vtype == T_PROTOBUF_VERSION:
+                pbversion = data.decode("utf8")
+                if google.protobuf.__version__.split(".") < pbversion.split("."):
+                    warnings.warn(f"File uses more recent of protobuf ({pbversion})")
 
             else:
                 raise Exception(f"Unknown message type {vtype}")
