@@ -8,7 +8,7 @@ with open('README.md', 'r', 'utf-8') as fd:
 
 setup(
     name='pbzlib',
-    version='0.20200312',
+    version='0.20200420',
     description='Library for serializing a list of protobuf objects',
     long_description=long_description,
     url='https://github.com/fabgeyer/pbzlib',

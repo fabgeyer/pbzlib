@@ -30,13 +30,13 @@ T_PROTOBUF_VERSION = 4
 
 
 class PBZWriter:
-    def __init__(self, fname, fdescr, autoflush=False):
+    def __init__(self, fname, fdescr, compresslevel=9, autoflush=False):
         self._ve = _VarintEncoder()
         self._dpool = descriptor_pool.DescriptorPool()
         self._last_descriptor = None
         self.autoflush = autoflush
 
-        self._fobj = gzip.open(fname, "wb")
+        self._fobj = gzip.open(fname, "wb", compresslevel=compresslevel)
         self._write_header(fdescr)
 
     def __enter__(self):
