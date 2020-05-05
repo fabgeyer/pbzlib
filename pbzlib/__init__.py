@@ -105,7 +105,7 @@ def write_pbz(fname, fdescr, *msgs):
         w.close()
 
 
-def open_pbz(fname):
+def open_pbz(fname, return_descriptor=False, return_raw_object=False):
     dpool = descriptor_pool.DescriptorPool()
     descr = None
 
@@ -144,8 +144,15 @@ def open_pbz(fname):
                 descr = dpool.FindMessageTypeByName(data.decode("utf8"))
 
             elif vtype == T_MESSAGE:
-                msg = reflection.ParseMessage(descr, data)
-                yield msg
+                if return_raw_object:
+                    yield data, descr
+
+                else:
+                    msg = reflection.ParseMessage(descr, data)
+                    if return_descriptor:
+                        yield msg, descr
+                    else:
+                        yield msg
 
             elif vtype == T_PROTOBUF_VERSION:
                 pbversion = data.decode("utf8")
