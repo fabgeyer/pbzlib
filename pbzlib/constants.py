@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+
+MAGIC = b'\x41\x42'
+T_FILE_DESCRIPTOR = 1
+T_DESCRIPTOR_NAME = 2
+T_MESSAGE = 3
+T_PROTOBUF_VERSION = 4

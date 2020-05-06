@@ -13,84 +13,8 @@ The messages passed to the function are then written to file, with first
 their descriptor full name and then their value.
 """
 
-import gzip
-import warnings
-import google.protobuf
-from google.protobuf import descriptor_pool
-from google.protobuf import reflection
-from google.protobuf.internal.decoder import _DecodeVarint32
-from google.protobuf.internal.encoder import _VarintEncoder
-from google.protobuf.descriptor_pb2 import FileDescriptorSet
-
-MAGIC = b'\x41\x42'
-T_FILE_DESCRIPTOR = 1
-T_DESCRIPTOR_NAME = 2
-T_MESSAGE = 3
-T_PROTOBUF_VERSION = 4
-
-
-class PBZWriter:
-    def __init__(self, fname, fdescr, compresslevel=9, autoflush=False):
-        self._ve = _VarintEncoder()
-        self._dpool = descriptor_pool.DescriptorPool()
-        self._last_descriptor = None
-        self.autoflush = autoflush
-
-        self._fobj = gzip.open(fname, "wb", compresslevel=compresslevel)
-        self._write_header(fdescr)
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, tb):
-        self.close()
-
-    def _write_header(self, fdescr):
-        # Read FileDescriptorSet
-        with open(fdescr, "rb") as fi:
-            fdset = fi.read()
-            sz = fi.tell()
-
-        # Parse descriptor for checking that the messages will be defined in
-        # the serialized file
-        ds = FileDescriptorSet()
-        ds.ParseFromString(fdset)
-        for df in ds.file:
-            self._dpool.Add(df)
-
-        self._fobj.write(MAGIC)
-
-        # Write protocol buffer version in header
-        self._write_blob(T_PROTOBUF_VERSION, len(google.protobuf.__version__), google.protobuf.__version__.encode("utf8"))
-
-        # Write FileDescriptorSet
-        self._write_blob(T_FILE_DESCRIPTOR, sz, fdset)
-
-    def _write_blob(self, mtype, size, value):
-        self._fobj.write(bytes([mtype]))
-        self._ve(self._fobj.write, size)
-        self._fobj.write(value)
-        if self.autoflush:
-            self._fobj.flush()
-
-    def close(self):
-        """
-        Close PBZ file
-        """
-        self._fobj.close()
-
-    def write(self, msg):
-        """
-        Writes a protobuf message to the file
-        """
-        if msg.DESCRIPTOR.full_name != self._last_descriptor:
-            # Check that the message type has been defined
-            self._dpool.FindMessageTypeByName(msg.DESCRIPTOR.full_name)
-
-            self._write_blob(T_DESCRIPTOR_NAME, len(msg.DESCRIPTOR.full_name), msg.DESCRIPTOR.full_name.encode("utf8"))
-            self._last_descriptor = msg.DESCRIPTOR.full_name
-
-        self._write_blob(T_MESSAGE, msg.ByteSize(), msg.SerializeToString())
+from pbzlib.reader import PBZReader
+from pbzlib.writer import PBZWriter
 
 
 def write_pbz(fname, fdescr, *msgs):
@@ -105,59 +29,5 @@ def write_pbz(fname, fdescr, *msgs):
         w.close()
 
 
-def open_pbz(fname, return_descriptor=False, return_raw_object=False):
-    dpool = descriptor_pool.DescriptorPool()
-    descr = None
-
-    with gzip.open(fname, "rb") as f:
-        assert f.read(len(MAGIC)) == MAGIC
-        while True:
-            try:
-                buf = f.read(5)
-            except:
-                break
-            if len(buf) < 2:
-                break
-
-            vtype = buf[0]
-            buf = buf[1:]
-            size, pos = _DecodeVarint32(buf, 0)
-            rsize = size - (4 - pos)
-            if rsize < 0:
-                data = buf[pos:pos + size]
-                f.seek(rsize, 1)
-            elif rsize == 0:
-                data = buf[pos:]
-            else:
-                try:
-                    data = buf[pos:] + f.read(rsize)
-                except:
-                    break
-
-            if vtype == T_FILE_DESCRIPTOR:
-                ds = FileDescriptorSet()
-                ds.ParseFromString(data)
-                for df in ds.file:
-                    dpool.Add(df)
-
-            elif vtype == T_DESCRIPTOR_NAME:
-                descr = dpool.FindMessageTypeByName(data.decode("utf8"))
-
-            elif vtype == T_MESSAGE:
-                if return_raw_object:
-                    yield data, descr
-
-                else:
-                    msg = reflection.ParseMessage(descr, data)
-                    if return_descriptor:
-                        yield msg, descr
-                    else:
-                        yield msg
-
-            elif vtype == T_PROTOBUF_VERSION:
-                pbversion = data.decode("utf8")
-                if google.protobuf.__version__.split(".") < pbversion.split("."):
-                    warnings.warn(f"File uses more recent of protobuf ({pbversion})")
-
-            else:
-                raise Exception(f"Unknown message type {vtype}")
+def open_pbz(fname):
+    return PBZReader(fname)
