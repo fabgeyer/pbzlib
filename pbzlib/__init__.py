@@ -30,4 +30,6 @@ def write_pbz(fname, fdescr, *msgs):
 
 
 def open_pbz(fname):
-    return PBZReader(fname)
+    r = PBZReader(fname)
+    while True:
+        yield r.next()

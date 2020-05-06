@@ -70,11 +70,11 @@ class PBZReader:
             else:
                 raise Exception(f"Unknown message type {vtype}")
 
-    def __iter__(self):
+    def next(self):
         while True:
             vtype, data = self._read_next_obj()
             if vtype is None:
-                break
+                raise StopIteration
 
             if vtype == T_DESCRIPTOR_NAME:
                 self._next_descr_name = data.decode("utf8")
@@ -82,9 +82,9 @@ class PBZReader:
 
             elif vtype == T_MESSAGE:
                 if self.return_raw_object:
-                    yield self._next_descr_name, self._next_descr, data
+                    return self._next_descr_name, self._next_descr, data
                 else:
-                    yield reflection.ParseMessage(self._next_descr, data)
+                    return reflection.ParseMessage(self._next_descr, data)
 
             else:
                 raise Exception(f"Unknown message type {vtype}")
