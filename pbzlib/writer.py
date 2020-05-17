@@ -4,13 +4,13 @@ from google.protobuf import descriptor_pool
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
 from google.protobuf.internal.encoder import _VarintEncoder
 
+from pbzlib.reader import PBZReader
 from pbzlib.constants import MAGIC, T_PROTOBUF_VERSION, T_FILE_DESCRIPTOR, T_DESCRIPTOR_NAME, T_MESSAGE
 
 
 class PBZWriter:
     def __init__(self, fname, fdescr, compresslevel=9, autoflush=False):
         self._ve = _VarintEncoder()
-        self._dpool = descriptor_pool.DescriptorPool()
         self._last_descriptor = None
         self.autoflush = autoflush
 
@@ -24,25 +24,31 @@ class PBZWriter:
         self.close()
 
     def _write_header(self, fdescr):
-        # Read FileDescriptorSet
-        with open(fdescr, "rb") as fi:
-            fdset = fi.read()
-            sz = fi.tell()
-
-        # Parse descriptor for checking that the messages will be defined in
-        # the serialized file
-        ds = FileDescriptorSet()
-        ds.ParseFromString(fdset)
-        for df in ds.file:
-            self._dpool.Add(df)
-
         self._fobj.write(MAGIC)
 
         # Write protocol buffer version in header
         self._write_blob(T_PROTOBUF_VERSION, len(google.protobuf.__version__), google.protobuf.__version__.encode("utf8"))
 
-        # Write FileDescriptorSet
-        self._write_blob(T_FILE_DESCRIPTOR, sz, fdset)
+        if type(fdescr) == PBZReader:
+            self._write_blob(T_FILE_DESCRIPTOR, len(fdescr._raw_descriptor), (fdescr._raw_descriptor))
+            self._dpool = fdescr._dpool
+
+        else:
+            # Read FileDescriptorSet
+            with open(fdescr, "rb") as fi:
+                fdset = fi.read()
+                sz = fi.tell()
+
+            # Write FileDescriptorSet
+            self._write_blob(T_FILE_DESCRIPTOR, sz, fdset)
+
+            # Parse descriptor for checking that the messages will be defined in
+            # the serialized file
+            self._dpool = descriptor_pool.DescriptorPool()
+            ds = FileDescriptorSet()
+            ds.ParseFromString(fdset)
+            for df in ds.file:
+                self._dpool.Add(df)
 
     def _write_blob(self, mtype, size, value):
         self._fobj.write(bytes([mtype]))

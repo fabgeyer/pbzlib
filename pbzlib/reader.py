@@ -20,7 +20,7 @@ class PBZReader:
 
         self._fobj = gzip.open(fname, "rb")
         assert self._fobj.read(len(MAGIC)) == MAGIC
-        self._dpool = self.read_descriptor_pool()
+        self._dpool, self._raw_descriptor = self.read_descriptor_pool()
 
     def _read_next_obj(self):
         try:
@@ -60,7 +60,7 @@ class PBZReader:
                 ds.ParseFromString(data)
                 for df in ds.file:
                     dpool.Add(df)
-                return dpool
+                return dpool, data
 
             elif vtype == T_PROTOBUF_VERSION:
                 pbversion = data.decode("utf8")
