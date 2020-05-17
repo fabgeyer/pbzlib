@@ -5,7 +5,7 @@ import warnings
 import google.protobuf
 from google.protobuf import descriptor_pool
 from google.protobuf import reflection
-from google.protobuf.internal.decoder import _DecodeVarint32
+from google.protobuf.internal.decoder import _DecodeVarint
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
 
 from pbzlib.constants import MAGIC, T_PROTOBUF_VERSION, T_FILE_DESCRIPTOR, T_DESCRIPTOR_NAME, T_MESSAGE
@@ -24,7 +24,7 @@ class PBZReader:
 
     def _read_next_obj(self):
         try:
-            buf = self._fobj.read(5)
+            buf = self._fobj.read(9)
         except:
             return None, None
 
@@ -33,8 +33,8 @@ class PBZReader:
 
         vtype = buf[0]
         buf = buf[1:]
-        size, pos = _DecodeVarint32(buf, 0)
-        rsize = size - (4 - pos)
+        size, pos = _DecodeVarint(buf, 0)
+        rsize = size - (8 - pos)
         if rsize < 0:
             data = buf[pos:pos + size]
             self._fobj.seek(rsize, 1)
