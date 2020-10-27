@@ -30,6 +30,10 @@ def write_pbz(fname, fdescr, *msgs):
 
 
 def open_pbz(fname):
+    sentinel = object()
     r = PBZReader(fname)
     while True:
-        yield r.next()
+        obj = r.next(sentinel)
+        if obj is sentinel:
+            return
+        yield obj

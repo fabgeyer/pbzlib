@@ -24,27 +24,18 @@ class PBZReader:
 
     def _read_next_obj(self):
         try:
-            buf = self._fobj.read(9)
+            bufsz = self._fobj.peek(9)[:9]
         except:
             return None, None
 
-        if len(buf) < 2:
+        if len(bufsz) < 2:
             return None, None
 
-        vtype = buf[0]
-        buf = buf[1:]
-        size, pos = _DecodeVarint(buf, 0)
-        rsize = size - (8 - pos)
-        if rsize < 0:
-            data = buf[pos:pos + size]
-            self._fobj.seek(rsize, 1)
-        elif rsize == 0:
-            data = buf[pos:]
-        else:
-            try:
-                data = buf[pos:] + self._fobj.read(rsize)
-            except:
-                return None, None
+        vtype = bufsz[0]
+        size, pos = _DecodeVarint(bufsz[1:], 0)
+
+        buf = self._fobj.read(1 + pos + size)
+        data = buf[1 + pos:]
 
         return vtype, data
 
@@ -70,11 +61,13 @@ class PBZReader:
             else:
                 raise Exception(f"Unknown message type {vtype}")
 
-    def next(self):
+    def next(self, default=None):
         while True:
             vtype, data = self._read_next_obj()
             if vtype is None:
-                raise StopIteration
+                if default is None:
+                    raise StopIteration
+                return default
 
             if vtype == T_DESCRIPTOR_NAME:
                 self._next_descr_name = data.decode("utf8")
