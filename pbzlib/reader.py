@@ -18,24 +18,34 @@ class PBZReader:
         self._next_descr = None
         self._next_descr_name = None
 
+        self._prevbuf = b""
         self._fobj = gzip.open(fname, "rb")
         assert self._fobj.read(len(MAGIC)) == MAGIC
         self._dpool, self._raw_descriptor = self.read_descriptor_pool()
 
     def _read_next_obj(self):
-        try:
-            bufsz = self._fobj.peek(9)[:9]
-        except:
-            return None, None
-
-        if len(bufsz) < 2:
+        """
+        Each object is encoded as:
+         - vtype (uint8_t): type of the object
+         - size (varint): size of the object as varint
+         - object itself
+        """
+        bufsz = self._prevbuf + self._fobj.read(9 - len(self._prevbuf))
+        if len(bufsz) == 0:
             return None, None
 
         vtype = bufsz[0]
         size, pos = _DecodeVarint(bufsz[1:], 0)
 
-        buf = self._fobj.read(1 + pos + size)
-        data = buf[1 + pos:]
+        if pos + size < 8:
+            data = bufsz[1 + pos: 1 + pos + size]
+            self._prevbuf = bufsz[1 + pos + size:]
+        elif pos + size < 8:
+            data = bufsz[1:]
+            self._prevbuf = b""
+        else:
+            data = bufsz[1+pos:] + self._fobj.read(size - 8 + pos)
+            self._prevbuf = b""
 
         return vtype, data
 
