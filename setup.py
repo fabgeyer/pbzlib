@@ -11,6 +11,7 @@ setup(
     version='0.20210128',
     description='Library for serializing a list of protobuf objects',
     long_description=long_description,
+    long_description_content_type="text/markdown",
     url='https://github.com/fabgeyer/pbzlib',
     author='fabgeyer',
     license='MIT',

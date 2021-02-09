@@ -5,7 +5,13 @@ The main use-case is to save and read a large collection of objects of the same 
 Each file contains a header with the description of the protocol buffer, meaning that no compilation of `.proto` description file is required before reading a `pbz` file.
 
 
-## Installation
+## Installation of the latest stable version
+
+```
+$ pip install --upgrade pbzlib
+```
+
+## Installation from source
 
 ```
 $ pip install --upgrade https://github.com/fabgeyer/pbzlib-py/archive/master.tar.gz

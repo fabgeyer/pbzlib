@@ -2,3 +2,6 @@ __pycache__
 *.descr
 *.pbz
 *_pb2.py
+build/*
+dist/*
+*.egg-info/*
