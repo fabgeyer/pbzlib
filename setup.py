@@ -8,11 +8,11 @@ with open('README.md', 'r', 'utf-8') as fd:
 
 setup(
     name='pbzlib',
-    version='0.20210128',
+    version='0.20211124',
     description='Library for serializing a list of protobuf objects',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url='https://github.com/fabgeyer/pbzlib',
+    url='https://github.com/fabgeyer/pbzlib-py',
     author='fabgeyer',
     license='MIT',
     classifiers=[

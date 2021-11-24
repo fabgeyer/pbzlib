@@ -17,7 +17,7 @@ from pbzlib.reader import PBZReader
 from pbzlib.writer import PBZWriter
 
 
-def write_pbz(fname, fdescr, *msgs):
+def write_pbz(fname: str, fdescr: str, *msgs):
     w = PBZWriter(fname, fdescr)
     if len(msgs) == 0:
         # Returns writer to caller
@@ -29,9 +29,9 @@ def write_pbz(fname, fdescr, *msgs):
         w.close()
 
 
-def open_pbz(fname):
+def open_pbz(fname: str, module=None):
     sentinel = object()
-    r = PBZReader(fname)
+    r = PBZReader(fname, module=module)
     while True:
         obj = r.next(sentinel)
         if obj is sentinel:
