@@ -31,6 +31,7 @@ for msg in open_pbz("/path/to/file.pbz"):
 
 ## Versions in other languages
 
+- [File format specification](https://github.com/fabgeyer/pbzlib-documentation)
 - [Go version](https://github.com/fabgeyer/pbzlib-go)
 - [Java version](https://github.com/fabgeyer/pbzlib-java)
 - [C/C++ version](https://github.com/fabgeyer/pbzlib-c-cpp)

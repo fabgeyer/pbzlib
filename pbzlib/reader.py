@@ -3,8 +3,8 @@
 import gzip
 import warnings
 import google.protobuf
-from typing import Any, Optional
 from google.protobuf import reflection
+from typing import Any, Optional, Tuple
 from google.protobuf.descriptor_pool import DescriptorPool
 from google.protobuf.internal.decoder import _DecodeVarint
 from google.protobuf.descriptor_pb2 import FileDescriptorSet
@@ -17,7 +17,7 @@ class PBZReader:
         self.return_raw_object = return_raw_object
 
         self._next_descr = None
-        self._next_descr_name = None
+        self._next_descr_name: Optional[str] = None
 
         self._prevbuf = b""
         self._fobj = gzip.open(fname, "rb")
@@ -33,12 +33,13 @@ class PBZReader:
             # Use the DescriptorPool provided by the passed module
             self._dpool = module.DESCRIPTOR.pool
 
-    def _read_next_obj(self) -> (Optional[int], Optional[bytes]):
+    def _read_next_obj(self) -> Tuple[Optional[int], Optional[bytes]]:
         """
         Each object is encoded as:
          - vtype (uint8_t): type of the object
          - size (varint): size of the object as varint
          - object itself
+        This is an internal method.
         """
         bufsz = self._prevbuf + self._fobj.read(9 - len(self._prevbuf))
         if len(bufsz) == 0:
@@ -59,11 +60,11 @@ class PBZReader:
 
         return vtype, data
 
-    def read_descriptor_pool(self) -> (DescriptorPool, Optional[bytes]):
+    def read_descriptor_pool(self) -> Tuple[DescriptorPool, Optional[bytes]]:
         dpool = DescriptorPool()
         while True:
             vtype, data = self._read_next_obj()
-            if vtype is None:
+            if vtype is None or data is None:
                 raise Exception("Unexpected end of file")
 
             if vtype == T_FILE_DESCRIPTOR:
@@ -83,10 +84,13 @@ class PBZReader:
 
         return dpool, None
 
-    def next(self, default: Any = None):
+    def next(self, default: Any = None) -> Any:
+        """
+        Get next protobuf object stored in PBZ
+        """
         while True:
             vtype, data = self._read_next_obj()
-            if vtype is None:
+            if vtype is None or data is None:
                 if default is None:
                     raise StopIteration
                 return default
@@ -103,3 +107,9 @@ class PBZReader:
 
             else:
                 raise Exception(f"Unknown message type {vtype}")
+
+    def close(self):
+        """
+        Close PBz file
+        """
+        self._fobj.close()
